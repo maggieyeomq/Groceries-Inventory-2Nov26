@@ -7,7 +7,7 @@ A shared household groceries inventory. Check it before buying so nothing gets b
 - **At home**: everything in the Fridge, Freezer, Pantry and Household, with +/− counts
 - **To buy**: only items that are running low or out, with a "Bought" button and a copy-for-WhatsApp list
 - **Use first**: items expiring in the next 3 days
-- **Scan receipt**: snap a photo of the shop receipt and Claude reads what was bought, matches it to the list, and adds the counts after you check them
+- **Scan receipt**: snap a photo of the shop receipt, or pick a screenshot of an e-receipt, and Claude reads what was bought, matches it to the list, and adds the counts after you check them
 
 ## How it's built
 

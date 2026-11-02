@@ -256,7 +256,7 @@ h1 span{color:var(--accent)}
   <button class="fab scan" id="scanBtn" type="button"><span class="plus" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg></span> Scan receipt</button>
   <button class="fab" id="fab" type="button"><span class="plus" aria-hidden="true">+</span> Add item</button>
 </div>
-<input type="file" id="receiptFile" accept="image/*" capture="environment" hidden>
+<input type="file" id="receiptFile" accept="image/*" hidden>
 <div id="sheetHost"></div>
 <div id="toastHost"></div>
 
@@ -371,7 +371,7 @@ function renderShop(){
       <span class="buy"><span>× ${fmtQ(u)} ${esc(it.unit)}</span>${canWrite?`<button class="got" data-got="${esc(it.id)}">Bought</button>`:""}</span></div>`}).join("")}
     <div class="foot"><span>ITEMS</span><span>${list.length}</span></div><div class="thanks">~ happy shopping ~</div></div>
    <div class="actions"><button class="btn" id="copyList">Copy list for WhatsApp</button></div>
-   <div class="scancta"><span><b>Back from the shop?</b><br>Snap the receipt and everything gets added at once.</span><button class="btn primary small" data-scan>Scan receipt</button></div>
+   <div class="scancta"><span><b>Back from the shop?</b><br>Snap the receipt or pick a screenshot of an e-receipt, and everything gets added at once.</span><button class="btn primary small" data-scan>Scan receipt</button></div>
    <p class="sub" style="margin:0;font-size:.85rem">Tap <b>Bought</b> at the shop and the item's count goes up by its usual amount, so it leaves this list.</p></div>`;
 }
 function renderSoon(){
@@ -488,17 +488,31 @@ function openSheet(it,prefill){
 /* ---------- receipt scan ---------- */
 const RECEIPT_PIC=`<svg viewBox="0 0 90 90" aria-hidden="true"><path d="M22 8h46v74l-6-4-6 4-6-4-6 4-6-4-6 4-6-4-4 4Z" fill="var(--receipt)" stroke="${E}" stroke-width="2.5" stroke-linejoin="round"/><path d="M30 22h30M30 30h22M30 38h26M30 46h18" stroke="${E}" stroke-width="2.5" stroke-linecap="round"/><circle cx="38" cy="60" r="2.4" fill="${E}"/><circle cx="52" cy="60" r="2.4" fill="${E}"/><path d="M41 66q4 3 8 0" stroke="${E}" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="33" cy="65" rx="3.5" ry="2" fill="var(--blush)"/><ellipse cx="57" cy="65" rx="3.5" ry="2" fill="var(--blush)"/></svg>`;
 function startScan(){if(!canWrite)return;const f=$("#receiptFile");f.value="";f.click()}
-function shrink(file){
+// Turns a photo or screenshot into 1-6 JPEG parts. Tall e-receipt screenshots are cut
+// into overlapping slices so the text stays large enough to read.
+function prepareImages(file){
   return new Promise((resolve,reject)=>{
     const url=URL.createObjectURL(file),img=new Image();
     img.onload=()=>{
-      const max=1800,sc=Math.min(1,max/Math.max(img.width,img.height));
-      const c=document.createElement("canvas");c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
-      const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
       URL.revokeObjectURL(url);
-      resolve(c.toDataURL("image/jpeg",0.85).split(",")[1]);
+      const W=img.naturalWidth,H=img.naturalHeight;
+      if(!W||!H)return reject(new Error("That file isn't a photo we can read. Try a JPG or PNG."));
+      const sliceH=Math.round(W*1.8),overlap=Math.round(W*0.12);
+      const starts=[];
+      if(H<=W*2.2)starts.push(0);
+      else{for(let y=0;y<H;y+=sliceH-overlap){starts.push(y);if(y+sliceH>=H)break}}
+      if(starts.length>6)return reject(new Error("That screenshot is very long. Split it into 2 or 3 screenshots and scan them one at a time."));
+      const parts=starts.map(y=>{
+        const h=starts.length===1?H:Math.min(sliceH,H-y);
+        const sc=Math.min(1,1568/Math.max(W,h));
+        const c=document.createElement("canvas");c.width=Math.round(W*sc);c.height=Math.round(h*sc);
+        const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);
+        x.drawImage(img,0,y,W,h,0,0,c.width,c.height);
+        return {data:c.toDataURL("image/jpeg",0.88).split(",")[1],mediaType:"image/jpeg"};
+      });
+      resolve(parts);
     };
-    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("That file isn't a photo we can read. Try a JPG or PNG."))};
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("That file isn't a photo we can read. Try a JPG or PNG screenshot."))};
     img.src=url;
   });
 }
@@ -509,17 +523,17 @@ function closeSheet(){$("#sheetHost").innerHTML=""}
 document.addEventListener("click",e=>{if(e.target.id==="scrim"&&$("#sc-x"))closeSheet()});
 async function onReceiptChosen(file){
   if(!file)return;
-  scanSheet(`<h3>Reading your receipt…</h3><div class="reading">${RECEIPT_PIC}<div class="bar"><i></i></div><span class="sub">Finding what was bought and how many. This takes about 10–20 seconds.</span></div>`);
-  let image;
-  try{image=await shrink(file)}catch(e){return scanError(e.message)}
+  scanSheet(`<h3>Reading your receipt…</h3><div class="reading">${RECEIPT_PIC}<div class="bar"><i></i></div><span class="sub">Finding what was bought and how many. This takes about 10–30 seconds.</span></div>`);
+  let images;
+  try{images=await prepareImages(file)}catch(e){return scanError(e.message)}
   let res,data;
   try{
     res=await fetch("/api/scan-receipt",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({image,mediaType:"image/jpeg",inventory:items.map(i=>({id:i.id,name:i.name,unit:i.unit}))})});
+      body:JSON.stringify({images,inventory:items.map(i=>({id:i.id,name:i.name,unit:i.unit}))})});
     data=await res.json().catch(()=>null);
   }catch{return scanError("Couldn't reach the receipt reader. Check your connection and try again.")}
   if(!res.ok||!data)return scanError(data?.message||"The receipt reader had a problem. Try again.");
-  if(!data.is_receipt||!data.items.length)return scanError("That doesn't look like a receipt we can read. Lay it flat, fit the whole receipt in the photo, and make sure it's in focus.");
+  if(!data.is_receipt||!data.items.length)return scanError("That doesn't look like a receipt we can read. For a photo, lay the receipt flat and make sure it's in focus. For a screenshot, make sure the item list is showing.");
   reviewScan(data);
 }
 function scanError(msg){

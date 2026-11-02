@@ -40,12 +40,16 @@ const TOOL = {
   },
 };
 
-function instructions(inventory) {
+function instructions(inventory, parts) {
   const list = inventory.length
     ? inventory.map((i) => `- id=${i.id} | ${i.name} | counted in ${i.unit}`).join("\n")
     : "(empty)";
-  return `This is a photo of a grocery receipt from a Singapore household's shopping trip.
-List every grocery or household item that was bought.
+  const intro =
+    parts > 1
+      ? `These ${parts} images are consecutive parts of ONE long grocery receipt (a screenshot cut into slices, top to bottom). Neighbouring parts overlap slightly, so a line at the bottom of one part may appear again at the top of the next: count each receipt line only once.`
+      : "This is a photo or screenshot of a grocery receipt (paper receipt, e-receipt, or online order summary).";
+  return `${intro}
+It is from a Singapore household's shopping trip. List every grocery or household item that was bought.
 
 Rules:
 - Skip lines that are not products: subtotal, total, GST, rounding, discounts, member points, plastic bags, payment and change lines.
@@ -84,13 +88,17 @@ module.exports = async function handler(req, res) {
   }
 
   const body = req.body || {};
-  const image = typeof body.image === "string" ? body.image : "";
-  const mediaType = MEDIA_TYPES.includes(body.mediaType) ? body.mediaType : null;
-  if (!image || !mediaType) {
-    return res.status(400).json({ error: "bad_image", message: "Send a JPEG, PNG or WebP photo." });
+  // Accept { images: [{data, mediaType}] } (photo or screenshot slices) or the older { image, mediaType }.
+  const raw = Array.isArray(body.images) ? body.images : [{ data: body.image, mediaType: body.mediaType }];
+  const images = raw.slice(0, 6).map((i) => ({
+    data: typeof (i && i.data) === "string" ? i.data : "",
+    mediaType: MEDIA_TYPES.includes(i && i.mediaType) ? i.mediaType : null,
+  }));
+  if (!images.length || images.some((i) => !i.data || !i.mediaType)) {
+    return res.status(400).json({ error: "bad_image", message: "Send a JPEG, PNG or WebP photo or screenshot." });
   }
-  if (image.length > MAX_IMAGE_CHARS) {
-    return res.status(413).json({ error: "too_big", message: "That photo is too large. Try again." });
+  if (images.reduce((n, i) => n + i.data.length, 0) > MAX_IMAGE_CHARS) {
+    return res.status(413).json({ error: "too_big", message: "That image is too large. Try again." });
   }
   const inventory = (Array.isArray(body.inventory) ? body.inventory : [])
     .slice(0, 400)
@@ -119,8 +127,8 @@ module.exports = async function handler(req, res) {
           {
             role: "user",
             content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data: image } },
-              { type: "text", text: instructions(inventory) },
+              ...images.map((i) => ({ type: "image", source: { type: "base64", media_type: i.mediaType, data: i.data } })),
+              { type: "text", text: instructions(inventory, images.length) },
             ],
           },
         ],
