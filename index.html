@@ -156,6 +156,34 @@ h1 span{color:var(--accent)}
 .empty b{color:var(--ink);font-family:var(--f-display);font-size:1.2rem;font-weight:600}
 
 .fab{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);border:2px solid var(--edge);border-radius:999px;padding:12px 20px 12px 14px;font-weight:800;font-size:1rem;box-shadow:0 4px 0 var(--edge);display:flex;gap:8px;align-items:center;z-index:5}
+.fabs{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:10px;z-index:5}
+.fabs .fab{position:static}
+.fab.scan{background:var(--surface);color:var(--ink)}
+.fab.scan .plus{background:var(--accent);color:var(--accent-ink)}
+.fab .plus svg{width:16px;height:16px}
+.scancta{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--ok-soft);border:2px dashed var(--ok);border-radius:16px;padding:12px 14px}
+.scancta b{font-family:var(--f-display);font-weight:600;font-size:1.05rem}
+.reading{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:16px 0 8px}
+.reading svg{width:90px;height:90px}
+@media (prefers-reduced-motion:no-preference){.reading svg{animation:scanbob 1.1s ease-in-out infinite}@keyframes scanbob{50%{transform:translateY(-6px) rotate(-4deg)}}}
+.reading .bar{width:180px;height:8px;border-radius:999px;background:var(--sunk);overflow:hidden;border:2px solid var(--line)}
+.reading .bar i{display:block;height:100%;width:40%;background:var(--accent);border-radius:999px}
+@media (prefers-reduced-motion:no-preference){.reading .bar i{animation:slide 1.2s ease-in-out infinite alternate}@keyframes slide{from{transform:translateX(-10%)}to{transform:translateX(160%)}}}
+.ritems{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:18px;overflow:hidden}
+.ritem{display:grid;grid-template-columns:28px 1fr;gap:6px 10px;padding:10px 12px;border-top:2px dashed var(--line);align-items:start}
+.ritem:first-child{border-top:0}
+.ritem.off{opacity:.45}
+.ritem input[type=checkbox]{width:22px;height:22px;margin:4px 0 0;accent-color:var(--accent)}
+.ritem .rb{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ritem .r1{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ritem .r1 input,.ritem .r1 select{border:2px solid var(--line);background:var(--sunk);border-radius:10px;padding:6px 8px;font-weight:700;min-width:0}
+.ritem .r1 .rn{flex:1 1 140px}
+.ritem .r1 .rq{width:72px}
+.ritem .r1 .ru{width:84px}
+.ritem .hint{font-size:.78rem;color:var(--muted)}
+.ritem .hint b{color:var(--ok)}
+.ritem .hint .new{color:var(--soon);font-weight:800}
+.ritem .line{font-family:var(--f-mono);font-size:.7rem;color:var(--muted);overflow-wrap:anywhere}
 .fab .plus{width:26px;height:26px;border-radius:50%;background:var(--accent-ink);color:var(--accent);display:grid;place-items:center;font-size:1.2rem;line-height:1}
 
 /* sheet */
@@ -224,7 +252,11 @@ h1 span{color:var(--accent)}
   <main id="main"></main>
 </div>
 
-<button class="fab" id="fab" type="button"><span class="plus" aria-hidden="true">+</span> Add item</button>
+<div class="fabs" id="fabs">
+  <button class="fab scan" id="scanBtn" type="button"><span class="plus" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg></span> Scan receipt</button>
+  <button class="fab" id="fab" type="button"><span class="plus" aria-hidden="true">+</span> Add item</button>
+</div>
+<input type="file" id="receiptFile" accept="image/*" capture="environment" hidden>
 <div id="sheetHost"></div>
 <div id="toastHost"></div>
 
@@ -285,7 +317,7 @@ function render(){
   if(!canWrite)b+=`<div class="banner warn"><span>You can view this list but not change it. Ask the owner to share it with you as a Contributor.</span></div>`;
   $("#banner").innerHTML=b;
   const ce=$("#clearEx");if(ce)ce.onclick=clearExamples;
-  $("#fab").hidden=!canWrite;
+  $("#fabs").hidden=!canWrite;
   document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",t.dataset.v===view));
   const m=$("#main");
   if(!loaded){m.innerHTML=`<div class="empty">${BASKET}<b>Loading your groceries…</b><span>Fetching the shared list.</span></div>`;return}
@@ -339,6 +371,7 @@ function renderShop(){
       <span class="buy"><span>× ${fmtQ(u)} ${esc(it.unit)}</span>${canWrite?`<button class="got" data-got="${esc(it.id)}">Bought</button>`:""}</span></div>`}).join("")}
     <div class="foot"><span>ITEMS</span><span>${list.length}</span></div><div class="thanks">~ happy shopping ~</div></div>
    <div class="actions"><button class="btn" id="copyList">Copy list for WhatsApp</button></div>
+   <div class="scancta"><span><b>Back from the shop?</b><br>Snap the receipt and everything gets added at once.</span><button class="btn primary small" data-scan>Scan receipt</button></div>
    <p class="sub" style="margin:0;font-size:.85rem">Tap <b>Bought</b> at the shop and the item's count goes up by its usual amount, so it leaves this list.</p></div>`;
 }
 function renderSoon(){
@@ -375,6 +408,7 @@ function bindMain(){
   m.querySelectorAll("[data-got]").forEach(b=>b.onclick=()=>{const it=byId(b.dataset.got);bump(it.id,+it.usual||1);toast(`Yay! ${it.name} restocked`)});
   m.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>openSheet(null));
   const c=$("#copyList");if(c)c.onclick=copyList;
+  m.querySelectorAll("[data-scan]").forEach(b=>b.onclick=startScan);
 }
 const byId=id=>items.find(i=>i.id===id);
 function stamp(){return{updated_at:new Date().toISOString(),updated_by:me||null}}
@@ -450,6 +484,106 @@ function openSheet(it,prefill){
     }catch(e2){onWriteErr(e2)}
   };
 }
+
+/* ---------- receipt scan ---------- */
+const RECEIPT_PIC=`<svg viewBox="0 0 90 90" aria-hidden="true"><path d="M22 8h46v74l-6-4-6 4-6-4-6 4-6-4-6 4-6-4-4 4Z" fill="var(--receipt)" stroke="${E}" stroke-width="2.5" stroke-linejoin="round"/><path d="M30 22h30M30 30h22M30 38h26M30 46h18" stroke="${E}" stroke-width="2.5" stroke-linecap="round"/><circle cx="38" cy="60" r="2.4" fill="${E}"/><circle cx="52" cy="60" r="2.4" fill="${E}"/><path d="M41 66q4 3 8 0" stroke="${E}" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="33" cy="65" rx="3.5" ry="2" fill="var(--blush)"/><ellipse cx="57" cy="65" rx="3.5" ry="2" fill="var(--blush)"/></svg>`;
+function startScan(){if(!canWrite)return;const f=$("#receiptFile");f.value="";f.click()}
+function shrink(file){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{
+      const max=1800,sc=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+      const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg",0.85).split(",")[1]);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("That file isn't a photo we can read. Try a JPG or PNG."))};
+    img.src=url;
+  });
+}
+function scanSheet(inner){
+  $("#sheetHost").innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Scan receipt">${inner}</div></div>`;
+}
+function closeSheet(){$("#sheetHost").innerHTML=""}
+document.addEventListener("click",e=>{if(e.target.id==="scrim"&&$("#sc-x"))closeSheet()});
+async function onReceiptChosen(file){
+  if(!file)return;
+  scanSheet(`<h3>Reading your receipt…</h3><div class="reading">${RECEIPT_PIC}<div class="bar"><i></i></div><span class="sub">Finding what was bought and how many. This takes about 10–20 seconds.</span></div>`);
+  let image;
+  try{image=await shrink(file)}catch(e){return scanError(e.message)}
+  let res,data;
+  try{
+    res=await fetch("/api/scan-receipt",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({image,mediaType:"image/jpeg",inventory:items.map(i=>({id:i.id,name:i.name,unit:i.unit}))})});
+    data=await res.json().catch(()=>null);
+  }catch{return scanError("Couldn't reach the receipt reader. Check your connection and try again.")}
+  if(!res.ok||!data)return scanError(data?.message||"The receipt reader had a problem. Try again.");
+  if(!data.is_receipt||!data.items.length)return scanError("That doesn't look like a receipt we can read. Lay it flat, fit the whole receipt in the photo, and make sure it's in focus.");
+  reviewScan(data);
+}
+function scanError(msg){
+  scanSheet(`<h3>Hmm, that didn't work</h3><div class="reading">${FACE.out.replace('class="face"','')}<span>${esc(msg)}</span></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn" id="sc-x">Close</button><button class="btn primary" id="sc-again">Try another photo</button></div>`);
+  $("#sc-x").onclick=closeSheet;$("#sc-again").onclick=startScan;
+}
+let scanRows=[];
+function reviewScan(data){
+  scanRows=data.items.map((it,ix)=>{
+    let m=it.match_id&&byId(it.match_id);
+    if(!m)m=items.find(i=>i.name.toLowerCase()===it.name.toLowerCase())||null;
+    return {...it,ix,on:true,matchId:m?m.id:null,unit:m?m.unit:it.unit};
+  });
+  const opts=(sel)=>LOCS.map(l=>`<option ${l===sel?"selected":""}>${l}</option>`).join("");
+  scanSheet(`<h3>Found ${scanRows.length} item${scanRows.length===1?"":"s"}${data.store?` from ${esc(data.store)}`:""}</h3>
+    <p class="sub" style="margin:0">Check the counts, untick anything you don't want added, then save.</p>
+    <div class="ritems">${scanRows.map(r=>{const m=r.matchId&&byId(r.matchId);return `<div class="ritem" data-ix="${r.ix}">
+      <input type="checkbox" id="sc-on-${r.ix}" checked aria-label="Include ${esc(r.name)}">
+      <div class="rb"><div class="r1">
+        <input class="rn" id="sc-name-${r.ix}" value="${esc(m?m.name:r.name)}" ${m?"disabled":""} aria-label="Item name">
+        <input class="rq" id="sc-qty-${r.ix}" type="number" min="0" step="any" inputmode="decimal" value="${fmtQ(r.qty)}" aria-label="Count bought">
+        <input class="ru" id="sc-unit-${r.ix}" value="${esc(r.unit)}" ${m?"disabled":""} aria-label="Unit">
+        ${m?"":`<select id="sc-loc-${r.ix}" aria-label="Kept in">${opts(r.location)}</select>`}
+      </div>
+      <span class="hint">${m?`Adds to <b>${esc(m.name)}</b> · have ${fmtQ(+m.qty||0)} ${esc(m.unit)} now`:`<span class="new">New item</span> · will be added to the list`}</span>
+      ${r.receipt_line?`<span class="line">${esc(r.receipt_line)}</span>`:""}</div></div>`}).join("")}</div>
+    <p class="err" id="sc-err" hidden></p>
+    <div class="actions" style="justify-content:space-between"><button class="btn" id="sc-x">Cancel</button><button class="btn primary" id="sc-save">Add to home</button></div>`);
+  const upd=()=>{const n=scanRows.filter(r=>$("#sc-on-"+r.ix).checked).length;$("#sc-save").textContent=n?`Add ${n} item${n===1?"":"s"} to home`:"Nothing selected";$("#sc-save").disabled=!n;
+    scanRows.forEach(r=>$(`.ritem[data-ix="${r.ix}"]`).classList.toggle("off",!$("#sc-on-"+r.ix).checked))};
+  scanRows.forEach(r=>$("#sc-on-"+r.ix).onchange=upd);upd();
+  $("#sc-x").onclick=closeSheet;
+  $("#sc-save").onclick=saveScan;
+}
+async function saveScan(){
+  const btn=$("#sc-save"),err=$("#sc-err");
+  const picked=[];
+  for(const r of scanRows){
+    if(!$("#sc-on-"+r.ix).checked)continue;
+    const qty=parseFloat($("#sc-qty-"+r.ix).value);
+    if(!isFinite(qty)||qty<0){err.textContent="Counts must be zero or more.";err.hidden=false;return}
+    if(r.matchId)picked.push({matchId:r.matchId,qty});
+    else{
+      const name=$("#sc-name-"+r.ix).value.trim();if(!name){err.textContent="Every new item needs a name.";err.hidden=false;return}
+      picked.push({name,qty,unit:$("#sc-unit-"+r.ix).value.trim()||"pcs",location:$("#sc-loc-"+r.ix).value});
+    }
+  }
+  btn.disabled=true;btn.textContent="Saving…";
+  try{
+    await load();
+    const merged={};
+    for(const p of picked){
+      const ex=p.matchId?byId(p.matchId):items.find(i=>i.name.toLowerCase()===p.name.toLowerCase());
+      if(ex){merged[ex.id]=(merged[ex.id]??(+ex.qty||0))+p.qty}
+      else await run(sb.from(TABLE).insert({name:p.name,qty:p.qty,unit:p.unit,location:p.location,low:1,usual:Math.max(1,p.qty),...stamp()}));
+    }
+    for(const id in merged){clearTimeout(pending[id]?.t);await run(sb.from(TABLE).update({qty:Math.round(merged[id]*100)/100,...stamp()}).eq("id",id))}
+    closeSheet();await load();
+    toast(`Yay! ${picked.length} item${picked.length===1?"":"s"} added from the receipt`);
+  }catch(e){console.error(e);btn.disabled=false;btn.textContent="Try saving again";err.textContent="Couldn't save. Check your connection and try again.";err.hidden=false}
+}
+$("#scanBtn").onclick=startScan;
+$("#receiptFile").addEventListener("change",e=>onReceiptChosen(e.target.files&&e.target.files[0]));
 
 /* ---------- boot ---------- */
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{view=t.dataset.v;render()});
